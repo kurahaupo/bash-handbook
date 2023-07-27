@@ -556,13 +556,15 @@ command1 || command2
 
 The return code of an _AND_ or _OR_ list is the exit status of the last executed command.
 
-# Conditional statements
+# Test statements
 
-Like in other languages, Bash conditionals let us decide to perform an action or not.  The result is determined by evaluating an expression, which should be enclosed in `[[ ]]`.
+Bash has some commands that exist purely to provide a "success" or "failure" exit status. There are three kinds:
 
-Conditional expression may contain `&&` and `||` operators, which are _AND_ and _OR_ accordingly. Besides this, there many [other handy expressions](#primary-and-combining-expressions).
-
-There are two different conditional statements: `if` statement and `case` statement.
+* `test` and `[`, which are ordinary commands, subject to the same rules for redirections, word-splitting and globbing as all other normal commands. The only difference between `test` and `[` is that `[` must have an extra `]` on the end; apart from that they function identically.
+* `[[` until the next `]]`, which
+  * does not perform redirections or word-splitting, and only performs globbing as part of explicit pattern matching; and
+  * allows the use of `&&` and `||` to combine multiple conditions, and `(` and `)` to control grouping.
+* `((` until the next matching `))`, for numeric expressions, using a C-like syntax. This does not perform redirections, word-splitting, or globbing. Indeed, other than `$` expansions, this is completely separate from the normal Bash commmand syntax. _Avoid_ using quotes inside `((...))`` commands.
 
 ## Primary and combining expressions
 
@@ -594,14 +596,14 @@ Expressions enclosed inside `[[ ]]` (or `[ ]` for `sh`) are called **test comman
 
 **Arithmetic binary operators:**
 
-| Primary             | Meaning                                                |
-| :-----------------: | :----------------------------------------------------- |
-| `[ ARG1 -eq ARG2 ]` | `ARG1` is **eq**ual to `ARG2`.                         |
-| `[ ARG1 -ne ARG2 ]` | `ARG1` is **n**ot **e**qual to `ARG2`.                 |
-| `[ ARG1 -lt ARG2 ]` | `ARG1` is **l**ess **t**han `ARG2`.                    |
-| `[ ARG1 -le ARG2 ]` | `ARG1` is **l**ess than or **e**qual to `ARG2`.        |
-| `[ ARG1 -gt ARG2 ]` | `ARG1` is **g**reater **t**han `ARG2`.                 |
-| `[ ARG1 -ge ARG2 ]` | `ARG1` is **g**reater than or **e**qual to `ARG2`.     |
+| Primary             | Can also be written  | Meaning                                                |
+| :-----------------: | :------------------: | :----------------------------------------------------- |
+| `[ ARG1 -eq ARG2 ]` | `(( ARG1 == ARG2 ))` | `ARG1` is **eq**ual to `ARG2`.                         |
+| `[ ARG1 -ne ARG2 ]` | `(( ARG1 != ARG2 ))` | `ARG1` is **n**ot **e**qual to `ARG2`.                 |
+| `[ ARG1 -lt ARG2 ]` | `(( ARG1 < ARG2 ))`  | `ARG1` is **l**ess **t**han `ARG2`.                    |
+| `[ ARG1 -le ARG2 ]` | `(( ARG1 <= ARG2 ))` | `ARG1` is **l**ess than or **e**qual to `ARG2`.        |
+| `[ ARG1 -gt ARG2 ]` | `(( ARG1 > ARG2 ))`  | `ARG1` is **g**reater **t**han `ARG2`.                 |
+| `[ ARG1 -ge ARG2 ]` | `(( ARG1 >= ARG2 ))` | `ARG1` is **g**reater than or **e**qual to `ARG2`.     |
 
 Conditions may be combined using these **combining expressions:**
 
@@ -614,9 +616,31 @@ Conditions may be combined using these **combining expressions:**
 
 Sure, there are more useful primaries and you can easily find them in the [Bash man pages](http://www.gnu.org/software/bash/manual/html_node/Bash-Conditional-Expressions.html).
 
+# Conditional statements
+
+There are two different conditional statements: `if` statement and `case` statement.
+
 ## Using an `if` statement
 
-`if` statements work the same as in other programming languages. If the expression within the braces is true, the code between `then` and `fi` is executed.  `fi` indicates the end of the conditionally executed code.
+`if` statements work quite differently from other programming languages. If you type `help if` you will be told
+```bash
+if COMMANDS; then COMMANDS; [ elif COMMANDS; then COMMANDS; ]... [ else COMMANDS; ] fi
+```
+(It is vitally important to understand that the square brackets in this output are _not_ part of the shell syntax; rather they indicate then enclosed part is _optional_.)
+
+Notice how it says `COMMANDS;` just before `then`. This has the same meaning as a [_list of_ commands](#Lists_of_commands) (as above).
+
+Now for the clever tricks:
+1. _every_ command has a success-or-failure status; and
+2. that "list of commands" before `then` can be `[` or `[[`. This is why you will most commonly see code like this:
+```bash
+if [[ $var = value ]] ; then
+  ...
+fi
+```
+using one of the conditional commands above.
+
+If the expression within the braces is true, the code between `then` and `fi` is executed.  `fi` indicates the end of the conditionally executed code.
 
 ```bash
 # Single-line
@@ -655,6 +679,32 @@ else
   echo "Apples are delicious!"
 fi
 ```
+
+Here's a longer example:
+```bash
+if
+  somecommand1
+  somecommand2
+  somecommand3
+  somecommand4
+then
+  echo "Some Command 4 succeeded"
+  somecommand5
+elif
+  echo "Some Command 4 failed"
+  somecommand6
+  somecommand7
+  somecommand8
+then
+  echo "Some Command 8 succeeded"
+  somecommand9
+else
+  echo "Some Command 8 succeeded"
+  somecommand10
+fi
+```
+In this case the statuses of `somecommand4` and `somecommand8` determine which other commands will be run.
+Yes there is more than one _command_ between `if` and `then`. That's not a mistake, that's really allowed by Bash (and any POSIX shell).
 
 ## Using a `case` statement
 
